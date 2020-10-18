@@ -10,8 +10,8 @@
 using namespace std;
 
 const string LEVEL_SEPARATOR = ".";
-const string AND_STRING = "&";
-const string OR_STRING = "|";
+const string AND_STRING = "AND";
+const string OR_STRING = "OR";
 
 enum NodeType
 {
@@ -20,14 +20,20 @@ enum NodeType
     NODETYPE_AND
 };
 
-NodeType getNodeType(char operand)
+struct NodeWeightInterval
 {
-    if (operand == '|')
+    int min = 0;
+    int max = 0;
+};
+
+NodeType getNodeType(string operand)
+{
+    if (operand == OR_STRING)
     {
         return NODETYPE_OR;
     }
 
-    if (operand == '&')
+    if (operand == AND_STRING)
     {
         return NODETYPE_AND;
     }
@@ -70,30 +76,37 @@ struct Node
     NodeType nodeType;
     Node *parent;
     vector<Node *> children;
+    NodeWeightInterval *weightInterval;
+
+    ~Node()
+    {
+        delete weightInterval;
+        for (Node *n : children)
+        {
+            delete n;
+        }
+    }
 };
 
 Node *createNode(string line)
 {
     int level = 0;
     NodeType nodeType;
-    string op;
+    string linePart;
     int weight;
     Node *node;
-    size_t opPos = 0;
-    size_t weightPos = 0;
 
     size_t lastLSPos = line.find_first_not_of(LEVEL_SEPARATOR);
     if (lastLSPos != string::npos)
     {
         level = lastLSPos;
-        opPos = lastLSPos;
-        weightPos = lastLSPos;
     }
-
-    nodeType = getNodeType(line[opPos]);
+    
+    linePart = line.substr(lastLSPos, line.size());
+    nodeType = getNodeType(linePart);
     if (nodeType == NODETYPE_DATA)
     {
-        weight = atoi(line.c_str() + weightPos);
+        weight = stoi(linePart);
         if (weight == 0)
         {
             throw "Weight not parsed";
@@ -104,6 +117,7 @@ Node *createNode(string line)
     node->level = level;
     node->nodeType = nodeType;
     node->weight = weight;
+    node->weightInterval = new NodeWeightInterval;
     return node;
 }
 
@@ -135,7 +149,7 @@ Node *getRoot(Node *node, int level)
         throw "Invalid parsed level. Too small";
     }
     if (level > (node->level + 1))
-    {        
+    {
         throw "Invalid parsed level. Too large";
     }
     if (level == (node->level + 1))
@@ -185,20 +199,92 @@ Node *readTree(ifstream &in)
 
 void printTree(Node *node)
 {
-    cout << nodeToString(node) << endl;    
+    cout << nodeToString(node) << " [" << node->weightInterval->min << "; " << node->weightInterval->max << "]" << endl;
     for (int i = 0; i < node->children.size(); i++)
     {
         printTree(node->children[i]);
     }
 }
 
+void writeNoSolutions(Node *node, ofstream &out)
+{
+    out << "No solutions: tree weight inteval "
+        << " [" << node->weightInterval->min << "; " << node->weightInterval->max << "]" << endl;
+}
 
 void writeTree(Node *node, ofstream &out)
 {
-    out << nodeToString(node) << endl;    
+    out << nodeToString(node) << endl;
     for (int i = 0; i < node->children.size(); i++)
     {
         writeTree(node->children[i], out);
+    }
+}
+
+void calculateWeightIntervals(Node *node)
+{
+    if (node->nodeType == NODETYPE_DATA)
+    {
+        node->weightInterval->min = node->weight;
+        node->weightInterval->max = node->weight;
+        return;
+    }
+
+    for (int i = 0; i < node->children.size(); i++)
+    {
+        calculateWeightIntervals(node->children[i]);
+
+        if (node->nodeType == NODETYPE_AND)
+        {
+            node->weightInterval->min += node->children[i]->weightInterval->min;
+            node->weightInterval->max += node->children[i]->weightInterval->max;
+        }
+
+        if (node->nodeType == NODETYPE_OR)
+        {
+            if (node->weightInterval->min == 0 || node->weightInterval->min > node->children[i]->weightInterval->min)
+            {
+                node->weightInterval->min = node->children[i]->weightInterval->min;
+            }
+
+            if (node->weightInterval->max == 0 || node->weightInterval->max < node->children[i]->weightInterval->max)
+            {
+                node->weightInterval->max = node->children[i]->weightInterval->max;
+            }
+        }
+    }
+}
+
+bool hasSolution(Node *node, int maxWeight)
+{
+    return node->weightInterval->min <= maxWeight;
+}
+
+void filterTreeByMaxWeight(Node *node, int maxWeight)
+{
+    if (!hasSolution(node, maxWeight))
+    {
+        throw "No solutions: min node weight is " + to_string(node->weightInterval->min) + ", but max weight is " + to_string(maxWeight);
+    }
+
+    if (node->weightInterval->max <= maxWeight)
+    {
+        return;
+    }
+
+    for (int i = 0; i < node->children.size();)
+    {
+        if (node->nodeType == NODETYPE_OR && !hasSolution(node->children[i], maxWeight))
+        {
+            delete node->children[i];
+            node->children.erase(node->children.begin() + i);
+        }
+        else
+        {
+            int newMaxWeight = maxWeight - (node->weightInterval->min - node->children[i]->weightInterval->min);
+            filterTreeByMaxWeight(node->children[i], newMaxWeight);
+            i++;
+        }
     }
 }
 
@@ -216,18 +302,25 @@ int main()
     tree = readTree(in);
     in.close();
 
+    calculateWeightIntervals(tree);
 
-    cout << "Max weight: " << maxWeight << endl;
-
-    // delete --> 
-    cout << "Tree: " << endl;
-    printTree(tree);
-    // <-- delete
+    // printTree(tree);
 
     out.open(outputFileName);
-    writeTree(tree, out);
+    out << "Max weight: " << maxWeight << endl;
+    if (!hasSolution(tree, maxWeight))
+    {
+        writeNoSolutions(tree, out);
+    }
+    else
+    {
+        filterTreeByMaxWeight(tree, maxWeight);
+        writeTree(tree, out);
+    }
     out.close();
 
+    delete tree;
+    tree = nullptr;
     cout << "End of program" << endl;
     return 0;
 }
