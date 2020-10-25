@@ -2,16 +2,14 @@
 2: 007 finished observing
 2: 007 went to the end of queue
 2: 001 started observing
-6: 001 finished observing
-6: 001 went to the end of queue
+5: 009 left the queue
 6: 003 left the queue
-6: 009 left the queue
-6: 007 started observing
-7: 007 finished observing
+7: 001 finished observing
+7: 001 went to the end of queue
 7: 007 left the queue
 7: 001 started observing
-11: 001 finished observing
-11: 001 went to the end of queue
-11: 001 started observing
+12: 001 finished observing
+12: 001 went to the end of queue
+12: 001 started observing
 15: 001 finished observing
 15: 001 left the queue

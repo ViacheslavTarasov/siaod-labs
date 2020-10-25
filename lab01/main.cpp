@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <vector>
 
 using namespace std;
 
@@ -41,6 +42,8 @@ public:
     void push(Spy $spy);
     Spy pop();
     bool isEmpty();
+
+    vector<Spy> filterByPassesdTime(int passedTime);
 };
 
 SpyQueue::SpyQueue()
@@ -90,6 +93,80 @@ Spy SpyQueue::pop()
 bool SpyQueue::isEmpty()
 {
     return !head;
+}
+
+vector<Spy> SpyQueue::filterByPassesdTime(int passedTime)
+{
+    vector<Spy> outgoingSpyes;
+    Node *previos = head;
+    Node *current = head;
+    Node *priorityHead = NULL;
+    Node *priorityCurrent = NULL;
+
+    while (current != NULL)
+    {
+        if (current->spy.waitingTime >= passedTime)
+        {
+            previos = current;
+            current = current->next;
+            continue;
+        }
+
+        Node *temp = current;
+
+        if (previos == current)
+        {
+            head = head->next;
+            previos = current->next;
+        }
+        else
+        {
+            previos->next = current->next;
+        }
+
+        current = current->next;
+
+        if (priorityHead == NULL)
+        {
+            temp->next = NULL;
+            priorityHead = temp;
+        }
+        else
+        {
+            priorityCurrent = priorityHead;
+            Node *priorityPrevios = priorityHead;
+            while (priorityCurrent != NULL)
+            {
+                if (temp->spy.waitingTime < priorityCurrent->spy.waitingTime)
+                {
+                    if (priorityCurrent == priorityHead)
+                    {
+                        temp->next = priorityHead;
+                        priorityHead = temp;
+                    }
+                    else
+                    {
+                        temp->next = priorityCurrent;
+                        priorityPrevios->next = temp;
+                    }
+                    break;
+                }
+                priorityPrevios = priorityCurrent;
+                priorityCurrent = priorityCurrent->next;
+            }
+        }
+    }
+
+    while (priorityHead != NULL)
+    {
+        priorityCurrent = priorityHead;
+        outgoingSpyes.push_back(priorityHead->spy);
+        priorityHead = priorityHead->next;
+
+        delete priorityCurrent;
+    }
+
+    return outgoingSpyes;
 }
 
 SpyQueue initSpyQueue(string inputFileName)
@@ -148,9 +225,16 @@ void processSpyQueue(SpyQueue spyQueue, string outputFileName)
             }
 
             int observationTime = calculateObsrvationTime(spy, passedMinutes);
-
             out << getLogLine(passedMinutes, spy, STARTED_OBSERVING) << endl;
+
             passedMinutes += observationTime;
+
+            vector<Spy> outgoingSpyes = spyQueue.filterByPassesdTime(passedMinutes);
+            for (int i = 0; i < outgoingSpyes.size(); i++)
+            {
+                out << getLogLine(outgoingSpyes[i].waitingTime, outgoingSpyes[i], LEFT_QUEUE) << endl;
+            }
+
             out << getLogLine(passedMinutes, spy, FINISHED_OBSERVING) << endl;
             if (spy.waitingTime <= passedMinutes)
             {
