@@ -1,3 +1,12 @@
+/** Деревья. 19
+ * В  листьях  И-ИЛИ  дерева,  соответствующего некоторому 
+ * множеству  конструкций,  заданы   значения   массы.   Известно
+ * максимально допустимое значение массы изделия. Требуется усечь
+ * дерево   так,   чтобы   дерево    включало    все    элементы,
+ * соответствующие  допустимым  значениям массы,  но не содержало
+ * "лишних" вершин.  Конечное дерево выдать на экран в  наглядном
+ * виде
+  */
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -9,9 +18,10 @@
 
 using namespace std;
 
+const string DELIMITER = " ";
 const string LEVEL_SEPARATOR = ".";
-const string AND_STRING = "AND";
-const string OR_STRING = "OR";
+const string AND_STRING = "a";
+const string OR_STRING = "o";
 
 enum NodeType
 {
@@ -43,6 +53,23 @@ NodeType getNodeType(string operand)
     // throw "Invalid node type operand";
 }
 
+vector<string> split(string s, string delimiter)
+{
+    size_t pos_start = 0, pos_end, delim_len = delimiter.length();
+    string token;
+    vector<string> res;
+
+    while ((pos_end = s.find(delimiter, pos_start)) != string::npos)
+    {
+        token = s.substr(pos_start, pos_end - pos_start);
+        pos_start = pos_end + delim_len;
+        res.push_back(token);
+    }
+
+    res.push_back(s.substr(pos_start));
+    return res;
+}
+
 string nodeTypeToString(NodeType nodeType)
 {
     if (nodeType == NODETYPE_AND)
@@ -58,13 +85,10 @@ string nodeTypeToString(NodeType nodeType)
 
 int readMaxWeight(ifstream &in)
 {
-    int maxWeight;
-    if (in.is_open())
+    string line;
+    if (in.is_open() && getline(in, line))
     {
-        if (in >> maxWeight)
-        {
-            return maxWeight;
-        }
+        return stoi(line);
     }
     throw "Read max weight error";
 }
@@ -73,6 +97,7 @@ struct Node
 {
     int level;
     int weight;
+    string name;
     NodeType nodeType;
     Node *parent;
     vector<Node *> children;
@@ -101,12 +126,14 @@ Node *createNode(string line)
     {
         level = lastLSPos;
     }
-    
-    linePart = line.substr(lastLSPos, line.size());
-    nodeType = getNodeType(linePart);
+
+    linePart = line.substr(level, line.size());
+    vector<string> v = split(linePart, DELIMITER);
+
+    nodeType = getNodeType(v[1]);
     if (nodeType == NODETYPE_DATA)
     {
-        weight = stoi(linePart);
+        weight = stoi(v[1]);
         if (weight == 0)
         {
             throw "Weight not parsed";
@@ -114,6 +141,7 @@ Node *createNode(string line)
     }
 
     node = new Node();
+    node->name = v[0];
     node->level = level;
     node->nodeType = nodeType;
     node->weight = weight;
@@ -131,6 +159,9 @@ string nodeToString(Node *node)
             result += LEVEL_SEPARATOR;
         }
     }
+
+    result += node->name + " ";
+
     if (node->nodeType == NODETYPE_DATA)
     {
         result += to_string(node->weight);
@@ -168,7 +199,7 @@ Node *readTree(ifstream &in)
     Node *tree = NULL;
     if (in.is_open())
     {
-        while (in >> line)
+        while (getline(in, line))
         {
             node = createNode(line);
             if (node->level == 0 && tree != NULL)
@@ -307,7 +338,6 @@ int main()
     // printTree(tree);
 
     out.open(outputFileName);
-    out << "Max weight: " << maxWeight << endl;
     if (!hasSolution(tree, maxWeight))
     {
         writeNoSolutions(tree, out);
