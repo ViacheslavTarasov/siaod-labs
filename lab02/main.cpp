@@ -201,6 +201,7 @@ Node *readTree(ifstream &in)
     {
         while (getline(in, line))
         {
+            line.erase(std::remove(line.begin(), line.end(), '\r'), line.end());
             node = createNode(line);
             if (node->level == 0 && tree != NULL)
             {
