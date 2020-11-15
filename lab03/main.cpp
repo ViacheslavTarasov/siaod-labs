@@ -15,7 +15,7 @@
 using namespace std;
 
 const int INF = numeric_limits<int>::max();
-;
+const int INF_MINUS = numeric_limits<int>::min();
 
 struct StartEnd
 {
@@ -102,7 +102,7 @@ void writeCostMatrix(ofstream &out, int costMatrix[], int size)
     }
 }
 
-void writeResult(ofstream &out, stack<int> result)
+void writeResult(ofstream &out, stack<int> result, int maxWeight)
 {
     if (!out.is_open())
     {
@@ -113,6 +113,11 @@ void writeResult(ofstream &out, stack<int> result)
     {
         out << "path not found";
     }
+    else
+    {
+        out << "Max weight: " << maxWeight << endl;
+    }
+
     while (!result.empty())
     {
         out << " -> " << result.top();
@@ -160,57 +165,63 @@ int main()
 
     // --> implementation of Dijkstra's algorithm
     int tempPoints[numberOfPoints];
-    bool isConstPoints[numberOfPoints];
+    int constPoints[numberOfPoints];
     int path[numberOfPoints];
     for (size_t i = 0; i < numberOfPoints; i++)
     {
-        isConstPoints[i] = false;
         path[i] = INF;
-        tempPoints[i] = i == startEnd.start ? 0 : INF;
+        tempPoints[i] = i == startEnd.start ? INF : INF_MINUS;
+        constPoints[i] = i == startEnd.start ? INF : INF_MINUS;
     }
-    isConstPoints[startEnd.start] = true;
 
     bool changed = true;
     int current = startEnd.start;
-    int min = current;
+    int maxOfTempPoints = current;
     do
     {
         changed = false;
         for (size_t i = 0; i < numberOfPoints; i++)
         {
-            if (isConstPoints[i])
+            if (constPoints[i] != INF_MINUS)
             {
                 continue;
             }
 
-            if (costMatrix[current][i] != 0 && tempPoints[i] > (tempPoints[current] + costMatrix[current][i]))
+            if (costMatrix[current][i] != 0)
             {
-                tempPoints[i] = tempPoints[current] + costMatrix[current][i];
-                path[i] = current;
-                changed = true;
+                int minCapacity = std::min(constPoints[current], costMatrix[current][i]);
+                int temp = std::max(minCapacity, tempPoints[i]);
+                if (temp > tempPoints[i])
+                {
+                    tempPoints[i] = temp;
+                    path[i] = current;
+                    changed = true;
+                }
             }
 
-            if (tempPoints[i] == INF)
+            if (tempPoints[i] == INF_MINUS)
             {
                 continue;
             }
 
-            if (min == current || tempPoints[i] < tempPoints[min])
+            bool isFirstMaxOfTempPoints = maxOfTempPoints == current;
+            if (isFirstMaxOfTempPoints || tempPoints[i] > tempPoints[maxOfTempPoints])
             {
-                min = i;
+                maxOfTempPoints = i;
                 changed = true;
             }
         }
-        isConstPoints[min] = true;
-        current = min;
+        current = maxOfTempPoints;
+        constPoints[current] = tempPoints[current];
     } while (changed);
 
     // <-- implementation of Dijkstra's algorithm
+
     stack<int> result = pathToStack(path, startEnd);
 
     out.open(outputFileName);
     // writeCostMatrix(out, &costMatrix[0][0], numberOfPoints);
-    writeResult(out, result);
+    writeResult(out, result, constPoints[startEnd.end]);
     out.close();
 
     cout << "End of program" << endl;
